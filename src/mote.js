@@ -18,7 +18,7 @@ Mote.Collection = function(block) {
 
 Mote.Collection.prototype = {
 	
-	include: function(object) {
+	mixin: function(object) {
 		for (var key in object) this[key] = object[key];
 	},
 	
@@ -57,12 +57,14 @@ Mote.Collection.prototype = {
 		return found;
 	},
 	
+	validate: function() {},
+	
 	index_of: function(doc) {
 		
 		var docs = this.documents,
 			len = docs.length,
 			i = 0,
-			index;
+			index = -1;
 			
 		for (; i < len; i++) {
 			if (docs[i].id === doc.id) {
@@ -70,61 +72,88 @@ Mote.Collection.prototype = {
 				break;
 			}
 		}
-
+        
 		return index;
 	},
 	
 	insert: function(doc) {
-		this.documents.push(doc);
+	    if (!doc.is_new) return false;
+	    if (!this.validate(doc)) return false;
+	    
+	    doc.is_new = false;
+		this.documents.push(doc.copy());
 	},
 	
 	update: function(doc) {
+    	if (doc.is_new) return false;
+    	if (!this.validate(doc)) return false;
+    	
 		var index = this.index_of(doc);
-		this.documents.splice(index, 1, doc);
-	},
-	
-	validate: function() {}
+		this.documents.splice(index, 1, doc.copy());
+	}
 }
 
 Mote.Document = function(data, collection) {
-	this.load(data);
+	this.collection = collection;
+	this.name = Mote.NameHelper.singularize(collection.name);
 	this.is_new = true;
-	this.collection = collection || {};
 	this.errors = {};
+	this.data = {};
+	
+	this.load(data);
 }
 
 Mote.Document.prototype = {
 	
+	get: function(key) {
+	    return this.data[key];
+	},
+	
+	set: function(key, val) {
+	    return this.data[key] = val;
+	},
+	
 	load: function(attrs) {
-		var data = this.data = {};
+		var data = this.data;
 		for (var key in attrs) data[key] = attrs[key];
 	},
 	
 	save: function() {
-		this.is_new ? this.insert() : this.update();
+	    var col = this.collection;
+	    return this.is_new ? col.insert(this) : col.update(this);
 	},
-	
-	insert: function() {
-		this.errors = this.collection.validate(this);
-		if (this.errors) return false;
-		this.is_new = false;
-		this._generate_id();
-		this.collection.insert(this._duplicate());
-	},
-	
-	update: function() {
-		this.errors = this.collection.validate(this);
-		if (this.errors) return false;
-		this.collection.update(this._duplicate());
-	},
-		
-	_duplicate: function() {
+
+	copy: function() {
 		var doc = new Mote.Document(this.data, this.collection);
-		doc.id = this.id;
+        doc.id = this.id;
+        doc.is_new = this.is_new;
 		return doc;
 	},
 	
-	_generate_id: function() {
-		this.id = this.id || this.collection.uid();
+	embed: function(doc) {
+	    var name = doc.collection.name,
+            embeds = this.data[name] || (this.data[name] = []);            
+        embeds.push(doc);
 	}
+}
+
+Mote.NameHelper = {
+
+    singular: [],
+    plural: [],
+    
+    register: function(s, p) {
+        this.singular.push(s);
+        this.plural.push(p);
+    },
+    
+    singularize: function(name) {
+        var index = this.plural.indexOf(name);
+        return index > -1 ? this.singular[index] : name.replace(/s$/, '');
+    },
+    
+    pluralize: function(name) {
+        var index = this.singular.indexOf(name);
+        return index > -1 ? this.plural[index] : (name + 's');
+    }
 }
