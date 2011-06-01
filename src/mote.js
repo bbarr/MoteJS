@@ -18,7 +18,7 @@ Mote.Collection = function(block) {
 
 Mote.Collection.prototype = {
 	
-	mixin: function(object) {
+	use: function(object) {
 		for (var key in object) this[key] = object[key];
 	},
 	
@@ -128,12 +128,6 @@ Mote.Document.prototype = {
         doc.id = this.id;
         doc.is_new = this.is_new;
 		return doc;
-	},
-	
-	embed: function(doc) {
-	    var name = doc.collection.name,
-            embeds = this.data[name] || (this.data[name] = []);            
-        embeds.push(doc);
 	}
 }
 
@@ -155,5 +149,31 @@ Mote.NameHelper = {
     pluralize: function(name) {
         var index = this.singular.indexOf(name);
         return index > -1 ? this.plural[index] : (name + 's');
+    }
+}
+
+Mote.EmbeddedDocuments = {
+    
+    collection: {
+        
+        embeddable: {
+            many: [],
+            one: []
+        }, 
+        
+        embeds_many: function(col) {
+            this.embeddable.many.push(col);
+        },
+        
+        embeds_one: function(col) {
+            this.embeddable.one.push(col);
+        }
+    },
+    
+    document: {
+        
+        embed: function(doc) {
+            
+        }   
     }
 }
