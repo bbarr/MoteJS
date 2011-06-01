@@ -22,47 +22,109 @@ Mote.Collection.prototype = {
 		for (var key in object) this[key] = object[key];
 	},
 	
-	identify: function(object) {
-		object.id = this.documents.length;
-	}
+	uid: function() {
+		var count = 0;
+		return function() {
+			return count++;
+		}
+	}(),
+	
+	find: function(queries) {
+
+		var found = _(this.documents).filter(function(doc) {
+			
+			for (var key in queries) {
+				if (doc.data[key] != queries[key]) return false;
+			}
+
+			return doc;
+		});
+
+		return found || [];
+	},
+	
+	find_one: function(queries) {
+		
+		var found = _(this.documents).find(function(doc) {
+			
+			for (var key in queries) {
+				if (doc.data[key] != queries[key]) return false;
+			}
+			
+			return doc;
+		});
+		
+		return found;
+	},
+	
+	index_of: function(doc) {
+		
+		var docs = this.documents,
+			len = docs.length,
+			i = 0,
+			index;
+			
+		for (; i < len; i++) {
+			if (docs[i].id === doc.id) {
+				index = i;
+				break;
+			}
+		}
+
+		return index;
+	},
+	
+	insert: function(doc) {
+		this.documents.push(doc);
+	},
+	
+	update: function(doc) {
+		var index = this.index_of(doc);
+		this.documents.splice(index, 1, doc);
+	},
+	
+	validate: function() {}
 }
 
 Mote.Document = function(data, collection) {
-	this.data = data;
+	this.load(data);
 	this.is_new = true;
 	this.collection = collection || {};
+	this.errors = {};
 }
 
 Mote.Document.prototype = {
 	
-	set: function(key, val) {
-		this.data[key] = val;
-	},
-	
-	get: function(key) {
-		return this.data[key];
+	load: function(attrs) {
+		var data = this.data = {};
+		for (var key in attrs) data[key] = attrs[key];
 	},
 	
 	save: function() {
-		if (this.is_new) {
-			this.insert();
-		}
-		else {
-			this.update();
-		}
+		this.is_new ? this.insert() : this.update();
 	},
 	
 	insert: function() {
-		this.collection.identify(this);
-		this.is_new = false;		
-		var clone = Object.create(this);
-		this.set('name', 'blah!');
-		this.collection.documents.push(clone);
+		this.errors = this.collection.validate(this);
+		if (this.errors) return false;
+		this.is_new = false;
+		this._generate_id();
+		this.collection.insert(this._duplicate());
 	},
 	
 	update: function() {
-		var docs = this.collection.documents;
-		var index = docs.indexOf(this);
-		docs.splice(index, 1, Object.create(this));
+		this.errors = this.collection.validate(this);
+		if (this.errors) return false;
+		this.collection.update(this._duplicate());
+	},
+		
+	_duplicate: function() {
+		var doc = new Mote.Document(this.data, this.collection);
+		doc.id = this.id;
+		return doc;
+	},
+	
+	_generate_id: function() {
+		this.id = this.id || this.collection.uid();
 	}
 }

@@ -1,12 +1,16 @@
 describe('Mote.Collection', function() {
 	
-	var People;
+	var People,
+		allison;
 	
 	beforeEach(function() {
+		
 		People = new Mote.Collection(function() {
 			this.name = 'people';
 			this.keys = ['name', 'age'];
 		});
+		
+		allison = new People.Document({ name: 'allison' });
 	});
 	
 	describe('#instantiate', function() {
@@ -34,7 +38,6 @@ describe('Mote.Collection', function() {
 	describe('#Document', function() {
 
 		it ('should create a document with a link back to itself as "collection"', function() {
-			var allison = new People.Document({ name: 'allison' });
 			expect(allison.collection).toBe(People);
 		});
 	});
@@ -55,25 +58,67 @@ describe('Mote.Collection', function() {
 		});
 	});
 	
+	describe('#uid', function() {
+		
+		it ('should create an ID (auto-increment)', function() {
+			var brendan = new People.Document({name: 'brendan'});
+			allison.insert();
+			brendan.insert();
+			expect(allison.id).not.toEqual(brendan.id);
+		});
+		
+	});
+	
+	describe('#find', function() {
+		
+		it ('should return a set of documents that match', function() {
+			allison.save();
+			var allisons = People.find({ name: 'allison' });
+			expect(allisons[0].data).toEqual(allison.data);
+		});
+		
+		it ('should work for multiple conditions', function() {
+			allison.save();
+			var other_allison = new People.Document({ name: 'allison', age: 24 });
+			other_allison.save();
+			
+			var allisons = People.find({ name: 'allison', age: 24 });
+			expect(allisons[0].data).toEqual(other_allison.data);
+		});
+		
+	});
+	
+	describe('#find_one', function() {
+		
+		it ('should return first doc that matches', function() {
+			allison.save();
+			var one_allison = People.find_one({ name: 'allison' });
+			expect(one_allison.data).toEqual(allison.data);
+		});
+	});
+	
 	describe('#insert', function() {
 		
-		it ('should add document to collection', function() {
-			var allison = new People.Document({ name: 'allison' });
-			allison.save();
-			expect(People.documents[0]).toEqual(allison);
+		it ('should insert new document into collection', function() {
+			allison.is_new = false;
+			allison._generate_id();
+			var dup = allison._duplicate();
+			People.insert(dup);
+			expect(People.documents[0]).toBe(dup);
 		});
 	});
 	
 	describe('#update', function() {
-
-		it ('should update document if already exists', function() {
-			var allison = new People.Document({ name: 'allison' });
-			allison.save();
-			console.log(People.documents[0].get('name'));
-			allison.set('name', 'allicat');
-			console.log(People.documents[0].get('name'));			
-			expect(People.documents[0].get('name')).toBe('allicat');
-		});
+		
+		it ('should update document')
 	});
 	
+	describe('#index_of', function() {
+		
+		it ('should return the proper index of the passed document', function() {
+			allison.save();
+			var index = People.index_of(allison);
+			expect(index).toBe(0);
+		});
+	});
 });
