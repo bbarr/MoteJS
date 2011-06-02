@@ -6,20 +6,41 @@ Mote.Collection = function(block) {
 	var self = this;
 	
 	if (typeof block === 'undefined') throw new Exception('Collection requires an initialize function');
-
+	
+	// set up our customizable doc
+	this._document_prototype = Mote.Document.prototype;
+	
 	// run user provided initialization
 	block.call(this);
 	
 	if (typeof this.name === 'undefined') throw new Exception('Collection requires a name');
 	
 	this.documents = [];
-	this.Document = function(data) { return new Mote.Document(data, self); };
+	this.Document = function(data) { 
+		
+		var doc,
+			D = Mote.Document,
+			DP = D.prototype;
+
+		D.prototype = self._document_prototype;
+		doc = new Mote.Document(data, self); 
+		D.prototype = DP;
+		
+		return doc;
+	};
 }
 
 Mote.Collection.prototype = {
 	
-	use: function(object) {
-		for (var key in object) this[key] = object[key];
+	use: function(feature) {
+		
+		function extend(a, b) {
+			var key;
+			for (key in b) a[key] = b[key]
+		};
+		
+		extend(Mote.Collection.prototype, feature.collection || {});	
+		extend(this._document_prototype, feature.document || {})
 	},
 	
 	uid: function() {
@@ -79,8 +100,8 @@ Mote.Collection.prototype = {
 	insert: function(doc) {
 	    if (!doc.is_new) return false;
 	    if (!this.validate(doc)) return false;
-	    
 	    doc.is_new = false;
+		doc.id = this.uid();
 		this.documents.push(doc.copy());
 	},
 	
@@ -90,7 +111,9 @@ Mote.Collection.prototype = {
     	
 		var index = this.index_of(doc);
 		this.documents.splice(index, 1, doc.copy());
-	}
+	},
+	
+	validate: function() { return true }
 }
 
 Mote.Document = function(data, collection) {
@@ -173,7 +196,7 @@ Mote.EmbeddedDocuments = {
     document: {
         
         embed: function(doc) {
-            
-        }   
+        	
+        }
     }
 }

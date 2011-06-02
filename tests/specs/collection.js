@@ -6,6 +6,7 @@ describe('Mote.Collection', function() {
 	beforeEach(function() {
 		
 		People = new Mote.Collection(function() {
+			this.use(Mote.EmbeddedDocuments)
 			this.name = 'people';
 			this.keys = ['name', 'age'];
 		});
@@ -44,26 +45,33 @@ describe('Mote.Collection', function() {
 	
 	describe('#include', function() {
 		
-		it ('should add functionality', function() {
+		it ('should add functionality to collection', function() {
 			
 			var AdditionalFunctionality = {
-				x: [],
-				y: function() {}
+				collection: {
+					x: []
+				},
+				document: {
+					y: function() {}
+				}
 			}
 			
-			People.include(AdditionalFunctionality);
+			var Things = new Mote.Collection(function() {
+				this.use(AdditionalFunctionality);
+				this.name = 'things';
+				this.keys = ['x'];
+			});
 			
-			expect(typeof People.y).toEqual('function');
-			expect(People.x).toEqual([])
+			expect(People.x).toEqual([]);
 		});
 	});
 	
 	describe('#uid', function() {
 		
 		it ('should create an ID (auto-increment)', function() {
-			var brendan = new People.Document({name: 'brendan'});
-			allison.insert();
-			brendan.insert();
+			var brendan = new People.Document( {name: 'brendan'} );
+			allison.save();
+			brendan.save();
 			expect(allison.id).not.toEqual(brendan.id);
 		});
 		
@@ -100,17 +108,16 @@ describe('Mote.Collection', function() {
 	describe('#insert', function() {
 		
 		it ('should insert new document into collection', function() {
-			allison.is_new = false;
-			allison._generate_id();
-			var dup = allison._duplicate();
-			People.insert(dup);
-			expect(People.documents[0]).toBe(dup);
+			allison.save();
+			expect(People.documents[0]).toEqual(allison);
 		});
 	});
 	
 	describe('#update', function() {
 		
-		it ('should update document')
+		it ('should update document', function() {
+			console.log(People);
+		});
 	});
 	
 	describe('#index_of', function() {
