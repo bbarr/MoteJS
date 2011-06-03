@@ -1,27 +1,51 @@
 describe('Mote.Document', function() {
 	
-	describe('#insert', function() {
+	beforeEach(function() {
 		
-		it ('should add document to collection', function() {
-			allison.save();
-			expect(People.documents[0].data).toEqual(allison.data);
+		People = new Mote.Collection(function() {
+			this.name = 'people';
+			this.keys = ['name', 'age'];
+		});
+		
+		allison = new People.Document({ name: 'allison' });
+		
+		spyOn(People, 'insert');
+		spyOn(People, 'update');
+	});
+	
+	describe('#load', function() {
+		
+		it ('should return the value or nil', function() {
+			allison.load({ 'x': 'y' });
+			expect(allison.data['x']).toBe('y');
 		});
 	});
 	
-	describe('#update', function() {
+	describe('#save', function() {
 		
-		it ('should update document if already exists', function() {
+		it ('should call collection#insert if new', function() {
 			allison.save();
-			allison.set('name', 'allicat');
-			allison.update();
-			expect(allison.get('name')).toBe('allicat');
+			expect(People.insert).toHaveBeenCalled();
+		});
+		
+		it ('should call collection#update if not new', function() {
+			allison.is_new = false;
+			allison.save();
+			expect(People.update).toHaveBeenCalled();
 		});
 	});
-
-	describe('#prep', function() {
+	
+	describe('#copy', function() {
 		
-		it ('should create a duplicate document instance for storage', function() {
-			
+		it ('should be a copy by value, not reference', function() {
+			expect(allison.copy()).not.toBe(allison);
+			expect(allison.copy()).toEqual(allison);
+		});
+		
+		it ('should have independent object properties', function() {
+			var copy = allison.copy();
+			allison.data.name = 'alli';
+			expect(copy.data.name).not.toBe('alli');
 		});
 	});
 	

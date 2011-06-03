@@ -6,7 +6,6 @@ describe('Mote.Collection', function() {
 	beforeEach(function() {
 		
 		People = new Mote.Collection(function() {
-			this.use(Mote.EmbeddedDocuments)
 			this.name = 'people';
 			this.keys = ['name', 'age'];
 		});
@@ -43,7 +42,7 @@ describe('Mote.Collection', function() {
 		});
 	});
 	
-	describe('#include', function() {
+	describe('#use', function() {
 		
 		it ('should add functionality to collection', function() {
 			
@@ -116,7 +115,10 @@ describe('Mote.Collection', function() {
 	describe('#update', function() {
 		
 		it ('should update document', function() {
-			console.log(People);
+			allison.save();
+			allison.data['demeaner'] = 'happy';
+			allison.save();
+			expect(People.documents[0].data['demeaner']).toBe('happy');
 		});
 	});
 	
@@ -126,6 +128,14 @@ describe('Mote.Collection', function() {
 			allison.save();
 			var index = People.index_of(allison);
 			expect(index).toBe(0);
+		});
+	});
+	
+	describe('#validate', function() {
+		
+		it ('should not save if validate returns false', function() {
+			People.validate = function(doc) { return false; }
+			expect(allison.save()).toBe(false);
 		});
 	});
 });

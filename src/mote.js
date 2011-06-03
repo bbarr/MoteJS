@@ -7,9 +7,6 @@ Mote.Collection = function(block) {
 	
 	if (typeof block === 'undefined') throw new Exception('Collection requires an initialize function');
 	
-	// set up our customizable doc
-	this._document_prototype = Mote.Document.prototype;
-	
 	// run user provided initialization
 	block.call(this);
 	
@@ -17,16 +14,8 @@ Mote.Collection = function(block) {
 	
 	this.documents = [];
 	this.Document = function(data) { 
-		
-		var doc,
-			D = Mote.Document,
-			DP = D.prototype;
-
-		D.prototype = self._document_prototype;
-		doc = new Mote.Document(data, self); 
-		D.prototype = DP;
-		
-		return doc;
+		if (self._document_prototype) Mote.Document.prototype = self._document_prototype;
+		return new Mote.Document(data, self);
 	};
 }
 
@@ -34,13 +23,16 @@ Mote.Collection.prototype = {
 	
 	use: function(feature) {
 		
-		function extend(a, b) {
-			var key;
-			for (key in b) a[key] = b[key]
-		};
+		var util = Mote.Util;
 		
-		extend(Mote.Collection.prototype, feature.collection || {});	
-		extend(this._document_prototype, feature.document || {})
+		if (feature.collection) {
+			util.extend(Mote.Collection.prototype, feature.collection);
+		}
+		
+		if (feature.document) {
+			this._document_prototype || (this._document_prototype = Mote.Document.prototype);
+			util.extend(this._document_prototype, feature.document);
+		}
 	},
 	
 	uid: function() {
@@ -50,35 +42,43 @@ Mote.Collection.prototype = {
 		}
 	}(),
 	
-	find: function(queries) {
+	find: function(queries, limit) {
 
-		var found = _(this.documents).filter(function(doc) {
+		var docs = this.documents,
+			matches = [],
+			len = docs.length,
+			i = 0,
+			key,
+			match;
 			
-			for (var key in queries) {
-				if (doc.data[key] != queries[key]) return false;
+		for (; i < len; i++) {
+			
+			doc = docs[i];
+			match = true;			
+			
+			for (key in queries) {
+				if (doc.data[key] != queries[key]) {
+					match = false;
+					break;
+				}
 			}
+			
+			if (match) matches.push(doc);
+			
+			if (limit) {
+				if (matches.length === limit) {
+					break;
+				}
+			}
+		}
 
-			return doc;
-		});
-
-		return found || [];
+		return matches;
 	},
 	
 	find_one: function(queries) {
-		
-		var found = _(this.documents).find(function(doc) {
-			
-			for (var key in queries) {
-				if (doc.data[key] != queries[key]) return false;
-			}
-			
-			return doc;
-		});
-		
-		return found;
+		var matches = this.find(queries, 1);
+		return matches[0];
 	},
-	
-	validate: function() {},
 	
 	index_of: function(doc) {
 		
@@ -118,7 +118,7 @@ Mote.Collection.prototype = {
 
 Mote.Document = function(data, collection) {
 	this.collection = collection;
-	this.name = Mote.NameHelper.singularize(collection.name);
+	this.name = Mote.Naming.singularize(collection.name);
 	this.is_new = true;
 	this.errors = {};
 	this.data = {};
@@ -127,14 +127,6 @@ Mote.Document = function(data, collection) {
 }
 
 Mote.Document.prototype = {
-	
-	get: function(key) {
-	    return this.data[key];
-	},
-	
-	set: function(key, val) {
-	    return this.data[key] = val;
-	},
 	
 	load: function(attrs) {
 		var data = this.data;
@@ -154,7 +146,7 @@ Mote.Document.prototype = {
 	}
 }
 
-Mote.NameHelper = {
+Mote.Naming = {
 
     singular: [],
     plural: [],
@@ -199,4 +191,12 @@ Mote.EmbeddedDocuments = {
         	
         }
     }
+}
+
+Mote.Util = {
+	
+	extend: function(dest, src) {
+		var key;
+		for (key in src) dest[key] = src[key];
+	}
 }
