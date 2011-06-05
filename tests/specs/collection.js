@@ -46,11 +46,13 @@ describe('Mote.Collection', function() {
 		
 		it ('should add functionality to collection', function() {
 			
-			var AdditionalFunctionality = {
-				collection: {
+			var AdditionalFunctionality = function() {
+				
+				this.collection = {
 					x: []
-				},
-				document: {
+				};
+				
+				this.document = {
 					y: function() {}
 				}
 			}
@@ -61,7 +63,7 @@ describe('Mote.Collection', function() {
 				this.keys = ['x'];
 			});
 			
-			expect(People.x).toEqual([]);
+			expect(Things.x).toEqual([]);
 		});
 	});
 	
