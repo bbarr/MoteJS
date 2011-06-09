@@ -7,41 +7,31 @@ Mote.Collection = function(block) {
 	
 	if (typeof block === 'undefined') throw new Exception('Collection requires an initialize function');
 	
-	this._document_prototype = {};
-	this.documents = [];
-	this.Document = function(data) {
-		return Mote.Util.extend(new Mote.Document(data, self), self._document_prototype);
-	};
-	
+	// defaults to be overridden in block
+	this.name = '';
+	this.keys = [];	
+
 	// run user provided initialization
-	block.call(this);
+	block.call(this, this);
 	
 	if (typeof this.name === 'undefined') throw new Exception('Collection requires a name');
+
+	this.documents = {};
 }
 
 Mote.Collection.prototype = {
 	
 	use: function(Feature, block) {
-		
-		var util = Mote.Util,
-			feature = new Feature;
+		var feature = new Feature(this);
 
-		if (block) block(feature);
-	
-		if (feature.document) {
-			util.extend(this._document_prototype, feature.document);
-		}
-		
-		if (feature.collection) {
-			util.extend(this, feature.collection);
-		}
-		
+		// optional custom init
+		if (block) block.call(this, feature);
 	},
 	
 	uid: function() {
 		var count = 0;
 		return function() {
-			return count++;
+			return (count++).toString();
 		}
 	}(),
 	
@@ -196,13 +186,13 @@ Mote.EmbeddedDocuments = function() {
         
         embeds_many: function(col) {
             this.embeddable.many.push(col);
-			this._document_prototype[col.name] = [];
+	    this.keys.push(col.name);
         },
         
         embeds_one: function(col) {
             this.embeddable.one.push(col);
-			var doc_name = Mote.Naming.singularize(col.name);
-			this._document_prototype[doc_name] = {};
+	    var doc_name = Mote.Naming.singularize(col.name);
+	    this.keys.push(doc_name);
         }
     };
     
