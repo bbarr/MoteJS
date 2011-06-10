@@ -147,7 +147,7 @@ Mote.EmbeddedDocuments.prototype = {
 Mote.REST = function(col) {
 	
 	this.base_uri = '';
-	this.ajax = $.ajax;
+	this.ajax = ($) ? $.ajax : function() { return true; };
 	
 	var ns = { remote: this };
 	return ns;
