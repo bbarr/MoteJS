@@ -1,5 +1,16 @@
+/**
+ *  MoteJS is MongoDB-style javascript storage.
+ *  
+ *  - Documents are represented by simple javascript Objects.
+ *  - Collections manage these "documents" and help keep the store in synch.
+ *  - Extend functionality with custom plugins
+ *  - (Optional) RESTful persistance based on MongoLab's API.
+ *
+ *  @author Brendan Barr brendanbarr.web@gmail.com
+ */
 
 var Mote = {
+	version: '0.1',
 	collections: {}
 };
 
