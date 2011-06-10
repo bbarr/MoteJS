@@ -10,8 +10,7 @@
  */
 
 var Mote = {
-	version: '0.1',
-	collections: {}
+	version: '0.1'
 };
 
 Mote.Collection = function(block) {
@@ -30,12 +29,27 @@ Mote.Collection = function(block) {
 	if (this.name === '') throw new Exception('Collection requires a name');
 
 	this.documents = {};
-	Mote.collections[this.name] = this;
+
+	this.Document = function(data) {
+
+		var constructors = self.Document.constructors,
+		    len = constructors.length, 
+		    i = 0,
+		    extend = Mote.Util.extend;		
+
+		this.collection = self;
+		for (; i < len; i++) extend(this, new constructors[i]);
+		Mote.Util.extend(this, data);
+	}
+
+	this.Document.constructors = [];
+	this.Document.prototype = Mote.Util.clone(Mote.DocumentPrototype);
 }
 
 Mote.Collection.prototype = {
 	
 	use: function(Feature, block) {
+
 		var feature = new Feature(this);
 
 		// optional custom init
@@ -103,6 +117,31 @@ Mote.Collection.prototype = {
 	validate: function() { return true }
 }
 
+Mote.DocumentPrototype = {
+
+	save: function() {
+		return this.collection.save(this);
+	},
+
+	to_json: function() {
+		
+		var keys = this.collection.keys,
+		    json = {},
+		    key,
+		    prop;
+
+		for (key in this) {
+			if (keys.indexOf(key) > -1) {
+				prop = this[key];
+				prop = prop.to_json ? prop.to_json() : prop;
+				json[key] = prop;
+			}
+		}
+
+		return json;
+	}
+}
+
 Mote.Naming = {
 
     singular: [],
@@ -125,22 +164,45 @@ Mote.Naming = {
 }
 
 Mote.EmbeddedDocuments = function(col) {
+	
 	this.embeddable = [];
+	
+	Mote.Util.extend(col.Document.prototype, {
+		
+		embed: function(doc) {
+			
+			var doc_name = doc.name,
+			    col_name = doc.collection.name,
+			    keys = this.collection.keys,
+			    lens = keys.length,
+			    i = 0,
+			    key;
+
+			for (; i < len; i++) {
+				key = keys[i];
+				if (key === doc_name) {
+  				    this[key] = doc;
+			        }
+				else if (key === col_name) {
+				    this[key].push(doc);
+				}
+			}
+		}
+	});
 };
 
 Mote.EmbeddedDocuments.prototype = {
 
-	_embeds: function(name) {
-		this.embeddable.push(name);
-		this.keys.push(name);
-	},
-
     embeds_many: function(col) {
-		this._embeds(col.name);
+	var name = col.name;
+	this.keys.push(name);
+	this.Document.constructors.push(function() { this[name] = {} });
     },
     
     embeds_one: function(col) {
-		this._embeds(Mote.Naming.singularize(col.name));
+	var name = Mote.Naming.singularize(col.name)
+	this.keys.push(name);
+	this.Document.constructors.push(function() { this[name] = {} });
     }
 }
 
@@ -239,6 +301,38 @@ Mote.Util = {
 	
 	extend: function(dest, src) {
 		for (var key in src) dest[key] = src[key];
+		return dest;
+	},
+
+	is_defined: function(subject) { },
+
+	is_array: function(subject) { },
+
+	is_object: function(subject) { },
+
+	extend: function(dest, src, deep) {
+
+		var needs_recursive = false,
+		    key,
+		    prop,
+		    util = Mote.Util;
+
+		for (key in src) {
+			prop = src[key];
+
+			if (!util.is_defined()) continue;
+
+			if (deep) {
+				
+				needs_recursive = true;
+				if (util.is_array(prop)) dest[key] = [];
+				else if (util.is_object(prop)) dest[key] = {};
+				else needs_recursive = false;
+			}
+			
+			dest[key] = (needs_recursive) ? util.extend(dest[key], prop, true) : prop;
+		}
+
 		return dest;
 	},
 	
