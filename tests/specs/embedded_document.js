@@ -22,42 +22,27 @@ describe('Mote.EmbeddedDocument', function() {
 		
 		describe('#embeds_many', function() {
 			
-			it ('should set up an array in documents to contain embedded docs', function() {
+			it ('should add embedded collection name to embeddable array', function() {
 				People.embeds_many(Stats);
-				var allison = new People.Document({ name: 'allison' });
-				expect(allison.stats).toEqual([]);
+				expect(People.embeddable[0]).toEqual('stats');
+			});
+			
+			it ('should add embedded collection name to keys array', function() {
+				People.embeds_many(Stats);
+				expect(People.keys[1]).toEqual('stats');
 			});
 		});
 		
 		describe('#embeds_one', function() {
 			
-			it ('should set up an object to contain single documents', function() {
+			it ('should add singular embedded collection name to embeddable array', function() {
 				People.embeds_one(Stats);
-				var allison = new People.Document({ name: 'allison' });
-				expect(allison.stats).not.toBeDefined();
-				expect(allison.stat).toEqual({});
-			});
-		});
-	});
-	
-	describe('document extentions', function() {
-		
-		describe('#embed', function() {
-			
-			it ('should add a document to an array if its embed_many', function() {
-				People.embeds_many(Stats);
-				var allison = new People.Document({ name: 'allison' });
-				var age = new Stats.Document({ name: 'age' });
-				allison.embed(age);
-				expect(allison.stats[0]).toBe(age);
+				expect(People.embeddable[0]).toEqual('stat');
 			});
 			
-			it ('should add a document to another if its embed_one', function() {
+			it ('should add singular embedded collection name to keys array', function() {
 				People.embeds_one(Stats);
-				var allison = new People.Document({ name: 'allison' });
-				var age = new Stats.Document({ name: 'age' });
-				allison.embed(age);
-				expect(allison.stat).toBe(age);
+				expect(People.keys[1]).toEqual('stat');
 			});
 		});
 	});
