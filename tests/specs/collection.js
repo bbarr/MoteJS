@@ -10,7 +10,7 @@ describe('Mote.Collection', function() {
 			this.keys = ['name', 'age'];
 		});
 		
-		allison = { name: 'allison' };
+		allison = new People.Document({name: 'allison'});
 	});
 	
 	describe('#instantiate', function() {
@@ -56,11 +56,11 @@ describe('Mote.Collection', function() {
 		});
 	});
 	
-	describe('#uid', function() {
+	describe('#_generate_mote_id', function() {
 		
 		it ('should create an ID (auto-increment)', function() {
-			var spud = People.uid();
-			var scuz = People.uid();
+			var spud = People._generate_mote_id();
+			var scuz = People._generate_mote_id();
 			expect(spud).not.toEqual(scuz); // wow, this is thorough
 		});
 		
@@ -91,7 +91,7 @@ describe('Mote.Collection', function() {
 		
 		it ('should work for multiple conditions', function() {
 			People.save(allison);
-			var other_allison = { name: 'allison', age: 24 };
+			var other_allison = new People.Document({ name: 'allison', age: 24 });
 			People.save(other_allison);
 			
 			var allisons = People.find({ name: 'allison', age: 24 });
