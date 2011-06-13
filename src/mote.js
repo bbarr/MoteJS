@@ -27,15 +27,19 @@ Mote.Collection = function(block) {
 
 	this.documents = {};
 	this.Document = function(data) {
+
 		var extend = Mote.Util.extend;
-		this._collection = self;
+
+		this.collection = self;
+		this.data = {};
+
 		extend(this, self.Document.initial, true);
-		extend(this, data);
+		extend(this, new Mote.Publisher);
+		extend(this.data, data);
 	}
 
 	this.Document.initial = {};
-	Mote.Util.extend(this.Document.initial, new Mote.Publisher);
-	this.Document.prototype = Mote.Util.clone(Mote.DocumentPrototype);
+	this.Document.prototype = Mote.Util.clone(Mote.Document);
 	
 	// run user provided initialization
 	block.call(this, this);
@@ -53,7 +57,11 @@ Mote.Collection.prototype = {
 		if (block) block.call(this, feature);
 
 		Mote.Util.extend(this, feature);
-		
+
+		if (Feature.document_initial) {
+			Mote.Util.extend(this.Document.initial, Feature.document_initial);
+		}			
+
 		if (Feature.document_prototype) {
 			Mote.Util.extend(this.Document.prototype, Feature.document_prototype);
 		}
@@ -156,10 +164,10 @@ Mote.Publisher.prototype = {
  *
  *
  */
-Mote.DocumentPrototype = {
+Mote.Document = {
 
 	save: function() {
-		return this._collection.save(this);
+		return this.collection.save(this);
 	},
 	
 	saved: function() {
@@ -168,8 +176,9 @@ Mote.DocumentPrototype = {
 
 	collapse: function() {
 		
-		var keys = this._collection.keys,
+		var keys = this.collection.keys,
 			collapsed = {},
+			data = this.data,
 			key,
 			prop,
 			embedded,
@@ -177,9 +186,9 @@ Mote.DocumentPrototype = {
 			len,
 			i;
 			
-		for (key in this) {
+		for (key in data) {
 			
-			prop = this[key];
+			prop = data[key];
 			
 			if (keys.indexOf(key) === -1) continue;
 			
@@ -203,14 +212,7 @@ Mote.DocumentPrototype = {
 	},
 	
 	clone: function() {
-
-		var clone = {},
-			col = this._collection;
-
-		delete this._collection;
-		Mote.Util.extend(clone, this, true);
-		this._collection = clone._collection = col;
-		return clone;
+		return new this.collection.Document(this.data);
 	}
 }
 
@@ -241,9 +243,6 @@ Mote.Naming = {
     }
 }
 
-
-
-
 /**
  *
  */
@@ -254,13 +253,14 @@ Mote.EmbeddedDocuments.prototype = {
     embeds_many: function(col) {
 		var name = col.name;
 		this.keys.push(name);
-		this.Document.initial[name] = [];
+		this.Document.initial[name] = col;
     },
     
     embeds_one: function(col) {
 		var name = Mote.Naming.singularize(col.name)
 		this.keys.push(name);
-		this.Document.initial[name] = {};
+		col.cap_size = 1;
+		this.Document.initial[name] = col;
     }
 }
 
@@ -268,20 +268,17 @@ Mote.EmbeddedDocuments.document_prototype = {
 	
 	embed: function(doc) {
 
-		var col_name = doc._collection.name,
-			doc_name = Mote.Naming.singularize(col_name),
-		    keys = this._collection.keys,
+		var col_name = doc.collection.name,
+		    doc_name = Mote.Naming.singularize(col_name),
+		    keys = this.collection.keys,
 		    len = keys.length,
 		    i = 0,
 		    key;
 
 		for (; i < len; i++) {
 			key = keys[i];
-			if (key === doc_name) {
-			    this[key] = doc;
-		    }
-			else if (key === col_name) {
-			    this[key].push(doc);
+			if (key === col_name || key === doc_name) {
+			    this.data[key].insert(doc);
 			}
 		}
 	}
@@ -294,19 +291,19 @@ Mote.EmbeddedDocuments.document_prototype = {
  *
  *
  */
-Mote.REST = function(col) {
+Mote.Remote = function(col) {
 	
 	// use something predefined or try to grab something jquery-ish
-	Mote.REST.ajax || (Mote.REST.ajax = ($) ? $.ajax : function() { return true; });
+	Mote.Remote.ajax || (Mote.Remote.ajax = ($) ? $.ajax : function() { return true; });
 	
 	this.base_uri = '';
 	this.collection = col;
 	
-	// namespace under 'remote'
-	return { remote: this };
+	// namespace under 'Remote'
+	return { Remote: this };
 }
 
-Mote.REST.prototype = {
+Mote.Remote.prototype = {
 	
 	_append_segments: function(uri, segments) {
 		return uri.concat(segments);
@@ -346,8 +343,8 @@ Mote.REST.prototype = {
 
 	query: function(query, cb) {
 		var self = this;
-		Mote.REST.ajax({
-			url: self._collection.generate_uri(query),
+		Mote.Remote.ajax({
+			url: self.collection.generate_uri(query),
 			method: 'GET',
 			success: function(data) {
 				cb(data);
@@ -357,7 +354,7 @@ Mote.REST.prototype = {
 	
 	fetch: function(_id, cb) {
 		var self = this;
-		Mote.REST.ajax({
+		Mote.Remote.ajax({
 			url: self.generate_uri(_id),
 			method: 'GET',
 			success: function(data) {
@@ -367,12 +364,12 @@ Mote.REST.prototype = {
 	}
 }
 
-Mote.REST.document_prototype = {
+Mote.Remote.document_prototype = {
 	
 	save: function() {
 
 		var self = this,
-			col = this._collection,
+		    col = this.collection,
 		    method,
 		    url;
 
@@ -385,7 +382,7 @@ Mote.REST.document_prototype = {
 			url = col.generate_uri();
 		}
 
-		Mote.REST.ajax({
+		Mote.Remote.ajax({
 			url: url,
 			data: self.to_json(),
 			contentType: 'application/json',
@@ -397,7 +394,7 @@ Mote.REST.document_prototype = {
 	},
 	
 	saved: function() {
-		return this['_id'] && this['_id']['$oid'];
+		return this.data['_id'] && this.data['_id']['$oid'];
 	}
 }
 
