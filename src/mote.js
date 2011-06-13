@@ -53,6 +53,10 @@ Mote.Collection.prototype = {
 		if (block) block.call(this, feature);
 
 		Mote.Util.extend(this, feature);
+		
+		if (Feature.document_prototype) {
+			Mote.Util.extend(this.Document.prototype, Feature.document_prototype);
+		}
 	},
 	
 	find: function(queries, limit) {
@@ -199,10 +203,10 @@ Mote.DocumentPrototype = {
 	},
 	
 	clone: function() {
-		
+
 		var clone = {},
 			col = this._collection;
-			
+
 		delete this._collection;
 		Mote.Util.extend(clone, this, true);
 		this._collection = clone._collection = col;
@@ -243,31 +247,7 @@ Mote.Naming = {
 /**
  *
  */
-Mote.EmbeddedDocuments = function(col) {
-	
-	Mote.Util.extend(col.Document.prototype, {
-		
-		embed: function(doc) {
-
-			var col_name = doc._collection.name,
-				doc_name = Mote.Naming.singularize(col_name),
-			    keys = this._collection.keys,
-			    len = keys.length,
-			    i = 0,
-			    key;
-
-			for (; i < len; i++) {
-				key = keys[i];
-				if (key === doc_name) {
-  				    this[key] = doc;
-			    }
-				else if (key === col_name) {
-				    this[key].push(doc);
-				}
-			}
-		}
-	});
-};
+Mote.EmbeddedDocuments = function(col) {};
 
 Mote.EmbeddedDocuments.prototype = {
 
@@ -284,6 +264,28 @@ Mote.EmbeddedDocuments.prototype = {
     }
 }
 
+Mote.EmbeddedDocuments.document_prototype = {
+	
+	embed: function(doc) {
+
+		var col_name = doc._collection.name,
+			doc_name = Mote.Naming.singularize(col_name),
+		    keys = this._collection.keys,
+		    len = keys.length,
+		    i = 0,
+		    key;
+
+		for (; i < len; i++) {
+			key = keys[i];
+			if (key === doc_name) {
+			    this[key] = doc;
+		    }
+			else if (key === col_name) {
+			    this[key].push(doc);
+			}
+		}
+	}
+};
 
 
 
@@ -294,45 +296,14 @@ Mote.EmbeddedDocuments.prototype = {
  */
 Mote.REST = function(col) {
 	
-	this.base_uri = '';
-	this.collection = col;
+	// use something predefined or try to grab something jquery-ish
 	Mote.REST.ajax || (Mote.REST.ajax = ($) ? $.ajax : function() { return true; });
 	
-	Mote.Util.extend(col.Document.prototype, {
-		
-		save: function() {
-
-			var self = this,
-				col = this._collection,
-			    method,
-			    url;
-
-			if (this.saved()) {
-				method = 'PUT';
-				url = col.generate_uri(this['_id']['$oid']);
-			}
-			else {
-				method = 'POST';
-				url = col.generate_uri();
-			}
-
-			Mote.REST.ajax({
-				url: url,
-				data: self.to_json(),
-				contentType: 'application/json',
-				type: method,
-				success: function(data) {
-					
-				}
-			});
-		},
-		
-		saved: function() {
-			return this['_id'] && this['_id']['$oid'];
-		}
-	});
+	this.base_uri = '';
+	this.collection = col;
 	
- 	return { remote: this };
+	// namespace under 'remote'
+	return { remote: this };
 }
 
 Mote.REST.prototype = {
@@ -350,7 +321,7 @@ Mote.REST.prototype = {
 
 		query_string = query_string.substr(0, query_string.length - 1);
 		uri.push(query_string);
-		
+
 		return uri;
 	},
 		
@@ -396,6 +367,39 @@ Mote.REST.prototype = {
 	}
 }
 
+Mote.REST.document_prototype = {
+	
+	save: function() {
+
+		var self = this,
+			col = this._collection,
+		    method,
+		    url;
+
+		if (this.saved()) {
+			method = 'PUT';
+			url = col.generate_uri(this['_id']['$oid']);
+		}
+		else {
+			method = 'POST';
+			url = col.generate_uri();
+		}
+
+		Mote.REST.ajax({
+			url: url,
+			data: self.to_json(),
+			contentType: 'application/json',
+			type: method,
+			success: function(data) {
+				
+			}
+		});
+	},
+	
+	saved: function() {
+		return this['_id'] && this['_id']['$oid'];
+	}
+}
 
 
 /**
@@ -404,16 +408,19 @@ Mote.REST.prototype = {
  */
 Mote.Util = {
 	
-	extend: function(dest, src) {
-		for (var key in src) dest[key] = src[key];
-		return dest;
-	},
-
 	is_defined: function(subject) { return subject !== undefined && subject !== null },
 
 	is_array: function(subject) { return subject.constructor.toString().indexOf('Array') > -1 },
 
 	is_object: function(subject) { return subject && typeof subject === 'object' && typeof subject.length === 'undefined' },
+
+	clone: function() {
+		var F = function() {};
+		return function(o) {
+			F.prototype = o;
+			return new F;
+		}
+	}(),
 
 	extend: function(dest, src, deep) {
 		
@@ -441,13 +448,5 @@ Mote.Util = {
 		}
 
 		return dest;
-	},
-	
-	clone: function() {
-		var F = function() {};
-		return function(o) {
-			F.prototype = o;
-			return new F;
-		}
-	}()
+	}
 };
