@@ -127,10 +127,6 @@ Mote.Document = {
 	save: function() {
 		return this.collection.save(this);
 	},
-	
-	saved: function() {
-		return !!this['_mote_id'];
-	},
 
 	collapse: function() {
 		
