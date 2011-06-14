@@ -33,7 +33,8 @@ describe('Mote.DocumentPrototype', function() {
 			var stat = new Stats.Document({name: 'age', value: 25});
 			allison.embed(stat);
 			var json = allison.to_json();
-			expect(json).toEqual('{"stat":{"name":"age","value":25},"name":"allison"}');
+			console.log(json)
+			expect(json).toEqual('{"stat":[{"name":"age","value":25}],"name":"allison"}');
 		});
 		
 		it ('should act recusively on an array of embedded documents', function() {

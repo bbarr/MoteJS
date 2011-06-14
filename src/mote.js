@@ -20,13 +20,14 @@ Mote.Collection = function(block) {
 	if (typeof block === 'undefined') throw new Exception('Collection requires an initialize function');
 	
 	// defaults to be overridden in block
-	this.name = '';
-	this.keys = [];
+	self.name = '';
+	self.keys = [];
 
-	Mote.Util.extend(this, new Mote.Publisher);
+	Mote.Util.extend(self, new Mote.Publisher);
+	Mote.Util.extend(self, Mote.Collection.prototype);
 
-	this.documents = {};
-	this.Document = function(data) {
+	self.documents = {};
+	self.Document = function(data) {
 
 		var extend = Mote.Util.extend;
 
@@ -38,18 +39,18 @@ Mote.Collection = function(block) {
 		extend(this.data, data);
 	}
 
-	this.Document.initial = {};
-	this.Document.prototype = Mote.Util.clone(Mote.Document);
+	self.Document.initial = { data: {} };
+	self.Document.prototype = Mote.Util.clone(Mote.Document);
 	
 	// run user provided initialization
-	block.call(this, this);
+	block.call(self, self);
 
-	if (this.name === '') throw new Exception('Collection requires a name');
+	if (self.name === '') throw new Exception('Collection requires a name');
 }
 
 Mote.Collection.prototype = {
 	
-	use: function(Feature, block) {
+	plugin: function(Feature, block) {
 
 		var feature = new Feature(this);
 
@@ -59,7 +60,7 @@ Mote.Collection.prototype = {
 		Mote.Util.extend(this, feature);
 
 		if (Feature.document_initial) {
-			Mote.Util.extend(this.Document.initial, Feature.document_initial);
+			Mote.Util.extend(this.Document.initial, Feature.document_initial, true);
 		}			
 
 		if (Feature.document_prototype) {
@@ -81,7 +82,7 @@ Mote.Collection.prototype = {
 			match = true;			
 			
 			for (key in queries) {
-				if (doc[key] != queries[key]) {
+				if (doc.data[key] != queries[key]) {
 					match = false;
 					break;
 				}
@@ -97,16 +98,6 @@ Mote.Collection.prototype = {
 		}
 
 		return matches;
-	},
-	
-	find_one: function(query) {
-		var matches = this.find(query, 1);
-		return matches[0];
-	},
-	
-	contains: function(doc) {
-		if (!doc._mote_id) return false;
-		return !!this.documents[doc._mote_id];
 	},
 	
 	save: function(doc) {
@@ -125,39 +116,6 @@ Mote.Collection.prototype = {
 		}
 	}(),
 }
-
-/**
- *
- *
- *
- */
-Mote.Publisher = function() {
-	this.subscriptions = { '*': [] };
-}
-
-Mote.Publisher.prototype = {
-	
-	subscribe: function(topic, fn) {
-		
-		if (typeof topic === 'function') {
-			fn = topic;
-			topic = '*';
-		}
-		
-		(this.subscriptions[topic] || (this.subscriptions[topic] = [])).push(fn);
-	},
-	
-	publish: function(topic, data) {
-
-		var subs = (this.subscriptions[topic] || []).concat(this.subscriptions['*']),
-			len = subs.length,
-			i = 0;
-
-		for (; i < len; i++) subs[i](data);
-	}
-}
-
-
 
 /**
  *
@@ -212,9 +170,44 @@ Mote.Document = {
 	},
 	
 	clone: function() {
-		return new this.collection.Document(this.data);
+		var clone = new this.collection.Document(this.data);
+		clone._mote_id = this._mote_id;
+		return clone;
 	}
 }
+
+
+/**
+ *
+ *
+ *
+ */
+Mote.Publisher = function() {
+	this.subscriptions = { '*': [] };
+}
+
+Mote.Publisher.prototype = {
+	
+	subscribe: function(topic, fn) {
+		
+		if (typeof topic === 'function') {
+			fn = topic;
+			topic = '*';
+		}
+		
+		(this.subscriptions[topic] || (this.subscriptions[topic] = [])).push(fn);
+	},
+	
+	publish: function(topic, data) {
+
+		var subs = (this.subscriptions[topic] || []).concat(this.subscriptions['*']),
+			len = subs.length,
+			i = 0;
+
+		for (; i < len; i++) subs[i](data);
+	}
+}
+
 
 
 
@@ -253,14 +246,14 @@ Mote.EmbeddedDocuments.prototype = {
     embeds_many: function(col) {
 		var name = col.name;
 		this.keys.push(name);
-		this.Document.initial[name] = col;
+		this.Document.initial.data[name] = col;
     },
     
     embeds_one: function(col) {
 		var name = Mote.Naming.singularize(col.name)
 		this.keys.push(name);
 		col.cap_size = 1;
-		this.Document.initial[name] = col;
+		this.Document.initial.data[name] = col;
     }
 }
 
@@ -278,9 +271,11 @@ Mote.EmbeddedDocuments.document_prototype = {
 		for (; i < len; i++) {
 			key = keys[i];
 			if (key === col_name || key === doc_name) {
-			    this.data[key].insert(doc);
+			    return this.data[key].save(doc);
 			}
 		}
+		
+		return false;
 	}
 };
 
@@ -295,12 +290,7 @@ Mote.Remote = function(col) {
 	
 	// use something predefined or try to grab something jquery-ish
 	Mote.Remote.ajax || (Mote.Remote.ajax = ($) ? $.ajax : function() { return true; });
-	
 	this.base_uri = '';
-	this.collection = col;
-	
-	// namespace under 'Remote'
-	return { Remote: this };
 }
 
 Mote.Remote.prototype = {
@@ -337,14 +327,14 @@ Mote.Remote.prototype = {
 				else uri = this._append_query(uri, segments);
 			}
 		}
-		
+
 		return uri.join('/');
 	},
 
 	query: function(query, cb) {
 		var self = this;
 		Mote.Remote.ajax({
-			url: self.collection.generate_uri(query),
+			url: self.generate_uri(query),
 			method: 'GET',
 			success: function(data) {
 				cb(data);
@@ -366,7 +356,7 @@ Mote.Remote.prototype = {
 
 Mote.Remote.document_prototype = {
 	
-	save: function() {
+	persist: function() {
 
 		var self = this,
 		    col = this.collection,
@@ -375,7 +365,7 @@ Mote.Remote.document_prototype = {
 
 		if (this.saved()) {
 			method = 'PUT';
-			url = col.generate_uri(this['_id']['$oid']);
+			url = col.generate_uri(this.data['_id']['$oid']);
 		}
 		else {
 			method = 'POST';
@@ -440,7 +430,7 @@ Mote.Util = {
 				else if (util.is_object(prop)) dest[key] = {};
 				else needs_recursive = false;
 			}
-			
+
 			dest[key] = (needs_recursive) ? util.extend(dest[key], prop, true) : prop;
 		}
 
