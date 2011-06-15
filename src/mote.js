@@ -21,7 +21,7 @@ Mote.Collection = function(block) {
 	
 	// defaults to be overridden in block
 	self.name = '';
-	self.keys = [];
+	self.keys = ['_id'];
 
 	Mote.Util.extend(self, new Mote.Publisher);
 	Mote.Util.extend(self, Mote.Collection.prototype);
@@ -29,18 +29,16 @@ Mote.Collection = function(block) {
 	self.length = 0;
 	self.documents = [];
 	self.Document = function(data) {
-
 		var extend = Mote.Util.extend;
-
-		this.collection = self;
-		this.data = {};
-
-		extend(this, self.Document.initial, true);
 		extend(this, new Mote.Publisher);
+		extend(this, self.Document.initial, true);
 		extend(this.data, data);
 	}
 
-	self.Document.initial = { data: {} };
+	self.Document.initial = { 
+		data: {},
+		collection: self
+	};
 	self.Document.prototype = Mote.Util.clone(Mote.Document);
 	
 	// run user provided initialization
@@ -74,6 +72,7 @@ Mote.Collection.prototype = {
 
 		var docs = this.documents,
 			matches = [],
+			take_all = (queries === '*'), 
 			_mote_id,
 			key,
 			match;
@@ -84,7 +83,7 @@ Mote.Collection.prototype = {
 			match = true;			
 			
 			for (key in queries) {
-				if (queries[key] === '*' || doc.data[key] != queries[key]) {
+				if (!take_all && doc.data[key] != queries[key]) {
 					match = false;
 					break;
 				}
