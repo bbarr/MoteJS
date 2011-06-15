@@ -46,7 +46,7 @@ describe('Mote.Collection', function() {
 			AdditionalFunctionality.prototype.foo = 'bar';
 			
 			var Things = new Mote.Collection(function() {
-				this.use(AdditionalFunctionality);
+				this.plugin(AdditionalFunctionality);
 				this.name = 'things';
 				this.keys = ['x'];
 			});
@@ -69,30 +69,30 @@ describe('Mote.Collection', function() {
 	describe('#save', function() {
 		
 		it ('should insert new document into collection', function() {
-			var _mote_id = People.save(allison);
-			expect(People.documents[_mote_id]).toEqual(allison);
+			var _mote_id = allison.save();
+			expect(People.documents[0]).toEqual(allison);
 		});
 		
 		it ('should update document', function() {
-			var _mote_id = People.save(allison);
+			var _mote_id = allison.save();
 			allison.data.demeaner = 'happy';
-			People.save(allison);
-			expect(People.documents[_mote_id].data.demeaner).toBe('happy');
+			allison.save();
+			expect(People.documents[0].data.demeaner).toBe('happy');
 		});
 	});
 	
 	describe('#find', function() {
 		
 		it ('should return a set of documents that match', function() {
-			People.save(allison);
+			allison.save();
 			var allisons = People.find({ name: 'allison' });
 			expect(allisons[0]).toEqual(allison);
 		});
 		
 		it ('should work for multiple conditions', function() {
-			People.save(allison);
+			allison.save();
 			var other_allison = new People.Document({ name: 'allison', age: 24 });
-			People.save(other_allison);
+			other_allison.save();
 			
 			var allisons = People.find({ name: 'allison', age: 24 });
 			expect(allisons[0]).toEqual(other_allison);
@@ -103,7 +103,7 @@ describe('Mote.Collection', function() {
 	describe('#find_one', function() {
 		
 		it ('should return first doc that matches', function() {
-			People.save(allison);
+			allison.save();
 			var one_allison = People.find_one({ name: 'allison' });
 			expect(one_allison).toEqual(allison);
 		});
@@ -113,7 +113,7 @@ describe('Mote.Collection', function() {
 		
 		it ('should not save if validate returns false', function() {
 			People.validate = function(doc) { return false; }
-			expect(People.save(allison)).toBe(false);
+			expect(allison.save()).toBe(false);
 		});
 	});
 });

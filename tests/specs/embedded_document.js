@@ -7,7 +7,7 @@ describe('Mote.EmbeddedDocument', function() {
 		
 		People = new Mote.Collection(function() {
 			
-			this.use(Mote.EmbeddedDocuments);
+			this.plugin(Mote.EmbeddedDocuments);
 
 			this.name = 'people';
 			this.keys = [ 'name' ];
@@ -54,7 +54,7 @@ describe('Mote.EmbeddedDocument', function() {
 			var allison = new People.Document({ name: 'allison' });
 			var age = new Stats.Document({ age: 25 });
 			allison.embed(age);
-			expect(allison.data.stat.documents[age._mote_id]).toEqual(age);
+			expect(allison.data.stat.documents[0]).toEqual(age);
 		});
 		
 		it ('should add a single doc to an array if collection was called with embed_many', function() {
@@ -63,7 +63,8 @@ describe('Mote.EmbeddedDocument', function() {
 			var age = new Stats.Document({ age: 25 });
 			var appearance = new Stats.Document({ appearence: 'pleasing' });
 			allison.embed(age);
-			expect(allison.data.stats.documents[age._mote_id]).toEqual(age);
+			allison.embed(appearance);
+			expect(allison.data.stats.documents[1]).toEqual(appearance);
 		});
 	});
 });

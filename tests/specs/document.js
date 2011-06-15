@@ -7,7 +7,7 @@ describe('Mote.DocumentPrototype', function() {
 	beforeEach(function() {
 		
 		People = new Mote.Collection(function() {
-			this.use(Mote.EmbeddedDocuments)
+			this.plugin(Mote.EmbeddedDocuments)
 			this.name = 'people';
 			this.keys = ['name', 'age'];
 		});
