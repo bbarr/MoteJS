@@ -1,7 +1,6 @@
 describe('Mote.EmbeddedDocument', function() {
 	
-	var People,
-		Stats;
+	var People, Stats;
 	
 	beforeEach(function() {
 		
@@ -29,7 +28,7 @@ describe('Mote.EmbeddedDocument', function() {
 			
 			it ('should add array by collection name to Document.inital object', function() {
 				People.embeds_many(Stats);
-				expect(People.Document.initial.data['stats']).toEqual(Stats);
+				expect(People.Document.initial['stats']).toEqual(Stats);
 			});
 		});
 		
@@ -42,7 +41,7 @@ describe('Mote.EmbeddedDocument', function() {
 			
 			it ('should add object by singular collection name to Document.inital object', function() {
 				People.embeds_one(Stats);
-				expect(People.Document.initial.data['stat']).toEqual(Stats);
+				expect(People.Document.initial['stat']).toEqual(Stats);
 			});
 		});
 	});
@@ -54,7 +53,7 @@ describe('Mote.EmbeddedDocument', function() {
 			var allison = new People.Document({ name: 'allison' });
 			var age = new Stats.Document({ age: 25 });
 			allison.embed(age);
-			expect(allison.data.stat.documents[0]).toEqual(age);
+			expect(allison.stat.documents[0]).toEqual(age);
 		});
 		
 		it ('should add a single doc to an array if collection was called with embed_many', function() {
@@ -64,7 +63,7 @@ describe('Mote.EmbeddedDocument', function() {
 			var appearance = new Stats.Document({ appearence: 'pleasing' });
 			allison.embed(age);
 			allison.embed(appearance);
-			expect(allison.data.stats.documents[1]).toEqual(appearance);
+			expect(allison.stats.documents[1]).toEqual(appearance);
 		});
 	});
 });

@@ -75,9 +75,9 @@ describe('Mote.Collection', function() {
 		
 		it ('should update document', function() {
 			var _mote_id = allison.save();
-			allison.data.demeaner = 'happy';
+			allison.demeaner = 'happy';
 			allison.save();
-			expect(People.documents[0].data.demeaner).toBe('happy');
+			expect(People.documents[0].demeaner).toBe('happy');
 		});
 	});
 	
