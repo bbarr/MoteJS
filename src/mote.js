@@ -21,24 +21,28 @@ Mote.Collection = function(block) {
 	
 	// defaults to be overridden in block
 	self.name = '';
-	self.keys = ['_id'];
+	self.keys = [];
+
+	self.errors = {};
 
 	Mote.Util.extend(self, new Mote.Publisher);
 	Mote.Util.extend(self, Mote.Collection.prototype);
 
-	self.length = 0;
+	self.cap_size = 0;
 	self.documents = [];
 	self.Document = function(data) {
+
 		var extend = Mote.Util.extend;
-		extend(this, new Mote.Publisher);
+
+		this.collection = self;
+		this.data = {};
+
 		extend(this, self.Document.initial, true);
+		extend(this, new Mote.Publisher);
 		extend(this.data, data);
 	}
 
-	self.Document.initial = { 
-		data: {},
-		collection: self
-	};
+	self.Document.initial = { data: {} };
 	self.Document.prototype = Mote.Util.clone(Mote.Document);
 	
 	// run user provided initialization
@@ -59,6 +63,10 @@ Mote.Collection.prototype = {
 
 		extend(this, feature);
 
+		if (feature.init) {
+			feature.init();
+		}
+
 		if (Feature.document_initial) {
 			extend(this.Document.initial, Feature.document_initial, true);
 		}			
@@ -72,7 +80,6 @@ Mote.Collection.prototype = {
 
 		var docs = this.documents,
 			matches = [],
-			take_all = (queries === '*'), 
 			_mote_id,
 			key,
 			match;
@@ -83,7 +90,7 @@ Mote.Collection.prototype = {
 			match = true;			
 			
 			for (key in queries) {
-				if (!take_all && doc.data[key] != queries[key]) {
+				if (queries[key] !== '*' && doc.data[key] != queries[key] && doc[key] != queries[key]) {
 					match = false;
 					break;
 				}
@@ -126,28 +133,54 @@ Mote.Collection.prototype = {
 	},
 
 	insert: function(doc) {
-		if (!this.validate(doc)) return false;
+
+		var docs = this.documents;		
+
+		if (!this.validate(doc)) {
+			this.publish('error.insert', this.errors);
+			return false;
+		}
 		if (doc._mote_id) return false;
+		if (this.cap_size && docs.length === this.cap_size) this.remove(docs[0]);
+
 		doc._mote_id = this._generate_mote_id();
-		this.documents.push(doc.clone());
+		docs.push(doc.clone());
+		this.publish('change.insert', doc);
 		return doc;
 	},
 
 	update: function(doc) {
+
+		var index;
+
+		if (!this.validate(doc)) {
+			this.publish('error.update', this.errors);
+			return false;
+		}
+
 		if (!doc._mote_id) return false;
-		var index = this.index_of(doc);
+
+		index = this.index_of(doc);
 		if (index > -1) {
 			this.documents.splice(index, 1, doc.clone());
+			this.publish('change.update', doc);
 			return doc;
 		}
 		else return false
 	},
 
 	remove: function(doc) {
-		if (doc._mote_id) return false;
+
+		if (typeof doc === 'string') {
+			doc = this.find_one({ _mote_id: doc });
+		}
+
+		if (!doc._mote_id) return false;
+
 		var index = this.index_of(doc);
 		if (index > -1) {
-			this.documents.splice(index, 1);
+			var removed = this.documents.splice(index, 1);
+			this.publish('change.remove', removed[0]);
 			return this.documents.length;
 		}
 		else return false;
@@ -185,7 +218,21 @@ Mote.Collection.prototype = {
 Mote.Document = {
 
 	save: function() {
-		return this.collection[this._mote_id ? 'update' : 'insert'](this);
+		var saved = this[this._mote_id ? 'update' : 'insert']();
+		saved ? this.publish('change.save', this) : this.publish('error.save', this.collection.errors);
+		return saved;
+	},
+
+	insert: function() {
+		var inserted = this.collection.insert(this);
+		inserted ? this.publish('change.insert', this) : this.publish('error.insert', this.collection.errors);
+		return inserted;
+	},
+
+	update: function() {
+		var updated = this.collection.update(this);
+		updated ? this.publish('change.update', this) : this.publish('error.update', this.collection.errors);
+		return updated;
 	},
 
 	collapse: function() {
@@ -226,24 +273,29 @@ Mote.Publisher = function() {
 }
 
 Mote.Publisher.prototype = {
-	
-	subscribe: function(topic, fn) {
+
+	subscribe: function(topic, fn, scope) {
 		
 		if (typeof topic === 'function') {
+			scope = fn;
 			fn = topic;
 			topic = '*';
 		}
-		
+
+		fn.scope = scope || this;
 		(this.subscriptions[topic] || (this.subscriptions[topic] = [])).push(fn);
 	},
 	
 	publish: function(topic, data) {
 
 		var subs = (this.subscriptions[topic] || []).concat(this.subscriptions['*']),
-			len = subs.length,
-			i = 0;
+		    nss = topic.split('.'),
+		    len = subs.length,
+	        i = 0;
 
-		for (; i < len; i++) subs[i](data);
+		while (nss[0]) subs.concat(this.subscriptions[nss.shift()] || []);
+
+		for (; i < len; i++) subs[i].call(subs[i].scope || this, data, this);
 	}
 }
 
@@ -310,7 +362,7 @@ Mote.EmbeddedDocuments.document_prototype = {
 		for (; i < len; i++) {
 			key = keys[i];
 			if (key === col_name || key === doc_name) {
-			    return doc.save();
+			    return this.data[key].insert(doc);
 			}
 		}
 		
@@ -318,116 +370,97 @@ Mote.EmbeddedDocuments.document_prototype = {
 	}
 };
 
-
-
-/**
- *
- *
- *
- */
 Mote.Remote = function(col) {
-	
+
 	// use something predefined or try to grab something jquery-ish
-	Mote.Remote.ajax || (Mote.Remote.ajax = ($) ? $.ajax : function() { return true; });
-	this.base_uri = '';
+	Mote.Remote.ajax || (Mote.Remote.ajax = ($) ? $.ajax : new Error('Mote.Remote requires an AJAX utitlity'));
+	
+	this.action_config = {
+		base_uri: '',
+		success: function(data) { col.publish('remote.success.' + this.name, data) },
+		error: function(data) { col.publish('remote.error.' + this.name, data) }
+	};
 }
 
 Mote.Remote.prototype = {
-	
-	_append_segments: function(uri, segments) {
-		return uri.concat(segments);
+
+	generate_actions: function(temps) {
+		var name;
+		for (name in temps) this.generate_action(name, temps[name]);
 	},
 
-	_append_query: function(uri, query) {
-		
-		var query_string = '?',
-	 	    key;
-
-		for (key in query) query_string += (key + '=' + query[key].toString() + '&');
-
-		query_string = query_string.substr(0, query_string.length - 1);
-		uri.push(query_string);
-
-		return uri;
-	},
-		
-	generate_uri: function(segments, query) {	
-
-		var uri = [this.base_uri, this.name];
-
-		if (segments) {
-			
-			if (query) {
-				uri = this._append_segments(uri, segments);
-				uri = this._append_query(uri, query);
-			}
-			else {
-				if (segments[0]) uri = this._append_segments(uri, segments);
-				else uri = this._append_query(uri, segments);
-			}
-		}
-
-		return uri.join('/');
-	},
-
-	query: function(query, cb) {
-		this.subscribe('query_success', cb);
-		this._make_request('query', 'GET', this.generate_uri(query));
-	},
-	
-	fetch: function(_id, cb) {
-		this.subscribe('fetch_success', cb);
-		this._make_request('fetch', 'GET', this.generate_uri(_id));
-	},
-	
-	persist: function(doc) {
-		
-		var method,
-		    url,
-		    mongo_id = doc.get_mongo_id();
-
-		if (mongo_id) {
-			method = 'PUT';
-			url = this.generate_uri(mongo_id);
-		}
-		else {
-			method = 'POST';
-			url = this.generate_uri();
-		}
-
-		this._make_request('persist', method, url, doc.to_json());
-	},
-	
-	_make_request: function(action, method, url, data) {
+	generate_action: function(name, temp) {
 
 		var self = this,
-			request = {
-				url: url,
-				method: method,
-				contentType: 'application/json',
-				success: function(data) { self.publish(action + '_success', data) },
-				error: function(xhr) { self.publish(action + '_error', xhr) },
-				complete: self.dequeue
-			};
-			
-		if (data) request.data = data;
+		    action = new Mote.Remote.Action(name, temp, this.action_config);
 		
-		Mote.Remote.ajax(request);
-	}
+		this[name] = function() { action.fire(arguments) };
+	}	
 }
 
-Mote.Remote.document_prototype = {
+Mote.Remote.Action = function(name, temp, config) {
+
+	this.name = name;
 	
-	persist: function() {
-		if (!this.save()) return false;
-		this.collection.persist(this);
+	var parts = temp.split(' ');
+	this.method = parts[0];
+	this.template = parts[1];
+
+	this.params = this.template.match(/\:\w*/) || [];
+	
+	Mote.Util.extend(this, config);
+}
+
+Mote.Remote.Action.prototype = {
+	
+	fire: function(args) {
+
+		var request = this._generate(args),
+			self = this;
+
+		Mote.Remote.ajax({
+			url: request.uri,
+			type: request.method,
+			data: request.data,
+			contentType: request.content_type,
+			success: function() {
+				request.success.apply(self, arguments);
+			},
+			error: function() {
+				request.error.apply(self, arguments);
+			}
+		});
 	},
-	
-	get_mongo_id: function() {
-		if (this.data['_id']) return this.data['_id']['$oid'];
+
+	_generate: function(args) {
+
+		var request = {};
+
+		request.params = [].slice.call(args, 0);
+		request.data = (this.params.length < request.params.length) ? request.params.pop() : {};
+		request.success = this.success;
+		request.error = this.error;
+		
+		this._decorate_uri(request);
+
+		return request;
+	},
+
+	_decorate_uri: function(request) {
+
+		var uri = this.template,
+		    request_params = request.params,
+		    action_params = this.params,
+		    len = action_params.length,
+		    i = 0;
+
+		for (; i < len; i++) uri = uri.replace(action_params[i], request_params[i]);
+
+		if (this.base_uri) uri = this.base_uri + uri;
+		
+		request.uri = uri;
 	}
 }
-
 
 /**
  *
